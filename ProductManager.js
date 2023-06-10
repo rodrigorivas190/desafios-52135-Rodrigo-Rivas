@@ -1,71 +1,123 @@
-//Primer Desafio
+const fs = require('fs');
 
 class ProductManager {
 
-    #precioBaseDeGanancia
-    constructor() {
-        this.products = []
-        this.#precioBaseDeGanancia = 0.15
+    constructor(path) {
+        this.path = path;
+        this.format = 'utf-8';
     }
 
-    getProducts = () => { return this.products }
+    addProduct = async (title, description, price, thumbnail, code, stock) => {
+        const productos = { title, description, price, thumbnail, code, stock }
+        const list = await this.getProducts();
 
-    getNextID = () => {
-        const count = this.products.length
+        let idSuperior = 0;
+        for (const productos of list) {
+            if (productos.id > idSuperior) {
+                idSuperior = productos.id
+            }
+        }
+        const nuevaId = idSuperior+ 1;
+        productos.id = nuevaId;
 
-        if (count > 0) {
+        list.push(productos);
 
-            return this.products[count - 1].id + 1
-        } else {
-            return 1
+        await fs.promises.writeFile(this.path, JSON.stringify(list));
+    }
+
+    getProducts = async () => {
+        try {
+            const data = await fs.promises.readFile(this.path, this.format)
+            const dataObj = JSON.parse(data)
+            return dataObj
+        }
+        catch (error) {
+            console.log('el archivo no existe, se devuelve vacío');
+            return []
         }
     }
 
-    addProduct = (title, description, price, stock, code ) => {
-        const yaExisteCode = this.products.find((product) => product.code === code);
-        if(yaExisteCode){
-            console.log(`Error: se repite el campo CODE valor ${code}:`, title);
-            return;
-        }
-        const agregar = {
-            id: this.getNextID(),
-            title,
-            description,
-            price: price + (price * this.#precioBaseDeGanancia),
-            stock: stock || 50, 
-            code,
-            thumbnail: 'sin imagen'
-        }
-        if (!title || !description || !price || !code || !stock) {
-            console.log(`Error: Faltan campos que son obligatorios en el ${title}`);
-        } else {
-            this.products.push(agregar)
-        }
+    getProductbyId = async (id) => {
+        const buscar = await this.getProducts();
+        const buscarObj = buscar.find(item => item.id === id);
+        console.log((buscarObj) ? (`producto encontrado ${JSON.stringify(buscarObj)}`) : ('no se encontró ese id'));
     }
-    getProductById = (id) => {
-        const product = this.products.find(p => p.code === id);
-        return product || null;
+
+    write = async list => {
+        fs.promises.writeFile(this.path, JSON.stringify(list));
     }
+
+    async updateProduct (id, update) {
+        const list = await this.getProducts();
+        const idx = list.findIndex((e) => e.id == id);
+    
+        if (idx < 0) return "not found";
+    
+        Object.assign (list[idx], update)
+    
+        await this.write(list);
+        return list[idx];
+    }
+
+    updateProductObj = async (id, obj) => {
+        obj.id = id;
+        const list = await this.read();
+
+        const idx = list.findIndex((e) => e.id == id);
+        if (idx < 0) return;
+        list[idx] = obj;
+        await this.write(list);
+    }
+
+    deleteProduct = async (id) => {
+        const list = await this.getProducts();
+        const idx = list.findIndex((e) => e.id == id);
+        if (idx < 0) return;
+        list.splice(idx, 1);
+        await this.write(list);
+        return list;
+    }
+}
+
+async function run() {
+    const nuevoProducto = new ProductManager('archivo.json');
+    await nuevoProducto.addProduct('Libro Alma Mia', 'Novelas y Suspenso', 100, 'thumbnail2', 1,20)
+    await nuevoProducto.addProduct('Libro IT', 'Terror', 240, 'thumbnail2', 80, 15)
+    await nuevoProducto.addProduct('Libro Argentina', 'Documental', 500, 'thumbnail2', 15, 30)
+
+    const products = await nuevoProducto.getProducts();
+    console.log(products);
+
+    console.log("\n---------------------------------------------------------------------------\n");
+    console.log("\n Trato de agregar los mismos productos \n");
+
+    await nuevoProducto.addProduct('Libro Pasion y Alma',500, 'thumbnail2', 458, 45)
+    await nuevoProducto.addProduct('Libro En la oscuridad', 'Suspenso', 800, 'thumbnail2',88, 50)
+
+    console.log("\n---------------------------------------------------------------------------\n");
+    console.log(await nuevoProducto.getProducts());
+
+    console.log("\n---------------------------------------------------------------------------\n");
+    console.log("\n elimino producto: \n");
+
+    await nuevoProducto.deleteProduct(1);
+
+    console.log("\n---------------------------------------------------------------------------\n");
+    console.log("\n actualizo producto \n");
+
+    await nuevoProducto.updateProduct(2, { title: "La mano de dios", description: "deporte", price: 2500,thumbnail: 'thumbnail1',code: 564, stock: 3 });
+    console.log(await nuevoProducto.getProductbyId(2));
+
+    console.log("\n---------------------------------------------------------------------------\n");
+
+    console.log(await nuevoProducto.getProductbyId(3));
+
+    console.log("\n---------------------------------------------------------------------------\n");
+
+    console.log(await nuevoProducto.getProducts());
+
+    console.log("FIN");
 
 }
 
-const manager = new ProductManager()
-manager.addProduct('Libro Alma Mia', 'Novelas y Suspenso', 100, 1,20, '')
-manager.addProduct('Libro IT', 'Terror', 240, 80, 15, '')
-manager.addProduct('Libro Argentina', 'Documental', 500, 10, 15, '')
-manager.addProduct('Libro Pasion y Alma', '', 500, 10, 30, '')
-manager.addProduct('Libro En la oscuridad', 'Suspenso', 800, 10, 50, '')
-console.log(manager.getProducts())
-
-
-const productId = 8;
-const product = manager.getProductById(productId);
-if (product) {
-    console.log(`Producto con ID ${productId}:`, product);
-} else {
-    console.log(`No se encontró producto ${productId}.`);
-}
-
-
-
-
+run();
